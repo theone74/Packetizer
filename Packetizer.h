@@ -208,6 +208,7 @@ namespace packetizer {
     {
         using Buffer = RingBuffer<uint8_t, N_PACKET_DATA_SIZE>;
         typedef void (*callback_t)(const uint8_t* data, const uint8_t size);
+        typedef void (*callbackall_t)(const uint8_t id, const uint8_t* data, const uint8_t size);
         struct Map { uint8_t key; callback_t func; };
         using PacketQueue = RingBuffer<Buffer, N_PACKET_QUEUE_SIZE>;
         using CallbackMap = RingBuffer<Map, N_CALLBACK_SIZE>;
@@ -219,6 +220,7 @@ namespace packetizer {
     {
         using Buffer = std::vector<uint8_t>;
         using callback_t = std::function<void(const uint8_t* data, const uint8_t size)>;
+        using callbackall_t = std::function<void(const uint8_t id, const uint8_t* data, const uint8_t size)>;
         struct Map { uint8_t key; callback_t func; };
         using PacketQueue = std::queue<Buffer>;
         using CallbackMap = std::vector<Map>;
@@ -232,6 +234,7 @@ namespace packetizer {
         Buffer buffer;
         PacketQueue packets;
         CallbackMap callbacks;
+        callbackall_t callback = nullptr;
 
         bool b_parsing {false};
         bool b_escape {false};
@@ -241,8 +244,10 @@ namespace packetizer {
     public:
 
         using CallbackType = callback_t;
+        using CallbackTypeAll = callbackall_t;
         // TODO: std::map / unordered_map compile error for teensy in Arduino IDE...
         void subscribe(const uint8_t index, callback_t func) { callbacks.push_back({index, func}); }
+        void subscribeAll(callbackall_t func) { callback = func; }
 
         size_t available() const { return packets.size(); }
         uint8_t index() const { return packets.front()[INDEX_OFFSET_INDEX]; }
@@ -289,6 +294,11 @@ namespace packetizer {
                     c.func(data(), size());
                     pop();
                 }
+            }
+
+            if (callback != nullptr) {
+                callback(index(), data(), size());
+                pop();
             }
         }
 
